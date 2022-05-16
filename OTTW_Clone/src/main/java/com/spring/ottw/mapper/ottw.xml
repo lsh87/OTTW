@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- ==== #29. mapper 기본설정 ==== -->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- ==== #29. 루트 엘리먼트 & 네임스페이스 설정(프로젝트 전체내에서 유일해야 한다.) ==== -->
+<mapper namespace="ottw">
+
+	<!-- OTT 카테고리명과 로고 이미지 파일명 가져오기(select) -->
+	<select id="getOttCategoryList" resultType="com.spring.ottw.model.OttCategoryVO">
+		select categorynum, categoryname, categorylogo
+		from tbl_ottcategory
+		order by categorynum
+	</select>
+	
+	
+	<!-- 아이디 중복검사(select) -->
+	<select id="idDuplicateCheck" parameterType="String" resultType="String">
+		select id
+		from tbl_member
+		where id = #{id}
+	</select>
+	
+	
+	<!-- 회원가입(insert) -->
+	<insert id="signup" parameterType="com.spring.ottw.model.MemberVO">
+		insert into tbl_member(id, pwd, name, birthday, phone, email, memberstatus)
+		values(#{id}, #{pwd}, #{name}, #{birthday}, #{phone}, #{email}, default)
+	</insert>
+	
+	
+	<!-- 로그인하려는 사용자 VO 가져오기(select) -->
+	<select id="getLoginUser" parameterType="HashMap" resultType="com.spring.ottw.model.MemberVO">
+		select id, name, birthday, phone, email, memberstatus
+		from tbl_member
+		where id = #{id} and pwd = #{pwd}
+	</select>
+	
+	
+	<!-- 로그인하려는 사용자의 마지막 로그인 기록이 현재 기준 얼마나 경과했는지 조회하기(select) -->
+	<select id="getLastLogin" parameterType="HashMap" resultType="int">
+	<!--  	
+		select trunc(months_between(sysdate, logindate)) AS lastlogin
+		from tbl_log
+		where fk_id = #{id}
+	-->
+		select trunc(months_between(sysdate, to_date(nvl(to_char(logindate, 'yyyy-mm-dd'), to_char(sysdate, 'yyyy-mm-dd')), 'yyyy-mm-dd'))) AS lastlogin
+		from tbl_log
+		where fk_id = #{id}
+		order by logindate desc
+	</select>
+	
+	
+	<!-- 회원 상태를 휴면으로 전환하기(update) -->
+	<update id="updateMemberStatus" parameterType="HashMap">
+		update tbl_member
+		set memberstatus = 0
+		where id = #{id}
+	</update>
+	
+	
+	<!-- 로그인 기록(insert) -->
+	<insert id="insertLog" parameterType="HashMap">
+		insert into tbl_log(fk_id, logindate, clientip)
+		values(#{id}, default, #{clientip})
+	</insert>
+	
+	
+	<!-- 카테고리번호로 카테고리명 알아오기(select) -->
+	<select id="getCategoryName" parameterType="String" resultType="String">
+		select categoryname
+		from tbl_ottcategory
+		where categorynum = #{categorynum}
+	</select>
+	
+	
+	<!-- 파티 진행기간 총 일수 알아오기(select) -->
+	<select id="getTotalDate" parameterType="HashMap" resultType="int">
+		select to_date(#{enddate}, 'yyyy-mm-dd') - to_date(#{startdate}, 'yyyy-mm-dd')
+		from dual
+	</select>
+	
+	
+	<!-- 파티번호 중복검사(select) -->
+	<select id="getPartynum" parameterType="String" resultType="String">
+		select partynum
+		from tbl_party
+		where partynum = #{partynum}
+	</select>
+
+
+	<!-- 파티 생성하기(insert) -->
+	<insert id="createParty" parameterType="com.spring.ottw.model.PartyVO">
+		insert into tbl_party(partynum, partyname, startdate, enddate, nop, charge, fk_categorynum, partyleaderid, partystatus, ottid, ottpwd)
+		values(#{partynum}, #{partyname}, #{startdate}, #{enddate}, #{nop}, #{charge}, #{fk_categorynum}, #{partyleaderid}, default, #{ottid}, #{ottpwd})
+	</insert>
+	
+	
+	<!-- 카테고리번호로 파티 목록 알아오기(select) -->
+	<select id="getPartyList" parameterType="String" resultType="com.spring.ottw.model.PartyVO">
+		select partynum, partyname, to_char(startdate, 'yyyy.mm.dd') AS startdate, to_char(enddate, 'yyyy.mm.dd') AS enddate, 
+			   nop, charge, fk_categorynum, partyleaderid, partystatus, ottid, ottpwd
+		from tbl_party
+		where fk_categorynum = #{categorynum}
+		order by partystatus asc, startdate desc
+	</select>
+	
+	
+	<!-- 파티번호로 파티 정보 알아오기(select) : 멤버 테이블 조인(파티장 이름 select), 파티원 테이블 조인 -->
+	<select id="getParty" parameterType="String" resultType="com.spring.ottw.model.PartyVO">
+		select partynum, partyname, to_char(startdate, 'yyyy.mm.dd') AS startdate, to_char(enddate, 'yyyy.mm.dd') AS enddate, 
+			   nop, charge, fk_categorynum, partyleaderid, partystatus, ottid, ottpwd, categoryname
+		from tbl_party P
+		join tbl_ottcategory C
+		on P.fk_categorynum = C.categorynum
+		where partynum = #{partynum}
+	</select>
+	
+	
+	<!-- 파티원 아이디 중복검사(select) -->
+	<select id="partymemberidDuplicateCheck" parameterType="HashMap" resultType="String">
+		select partymemberid
+		from tbl_partymember
+		where partynum = #{partynum} and partymemberid = #{partymemberid}
+	</select>
+	
+	
+	<!-- 파티 모집인원 알아오기(select) -->
+	<select id="getNumberOfPerson" parameterType="HashMap" resultType="int">
+		select nop
+		from tbl_party
+		where partynum = #{partynum}
+	</select>
+	
+	
+	<!-- 파티원 추가하기(insert) -->
+	<insert id="addPartyMember" parameterType="HashMap">
+		insert into tbl_partymember(partynum, partymemberid)
+		values(#{partynum}, #{partymemberid})
+	</insert>
+	
+	
+	<!-- 모집 인원 감소하기(update) -->
+	<update id="subNumberOfPerson" parameterType="HashMap">
+		update tbl_party
+		set nop = nop - 1
+		where partynum = #{partynum}
+	</update>
+	
+	
+	<!-- 파티 상태 변경하기(update) : 모집중 -> 모집완료 -->
+	<update id="changePartyStatus" parameterType="HashMap">
+		update tbl_party
+		set partystatus = #{partystatus}
+		where partynum = #{partynum}
+	</update>
+	
+	
+	<!-- 파티에 참여중인 파티원 알아오기(select) -->
+	<select id="getPartyMemberList" parameterType="String" resultType="com.spring.ottw.model.PartyMemberVO">
+		select partynum, partymemberid
+		from tbl_partymember
+		where partynum = #{partynum}
+	</select>
+	
+	
+	<!-- 로그인 중인 사용자가 참여한 파티 목록(select) -->
+	<select id="getAttendPartyList" parameterType="String" resultType="com.spring.ottw.model.PartyVO">
+		select P.partynum, partyname, to_char(startdate, 'yyyy.mm.dd') AS startdate, to_char(enddate, 'yyyy.mm.dd') AS enddate,
+		 	   nop, charge, fk_categorynum, partyleaderid, partystatus, ottid, ottpwd
+		from tbl_party P
+		join tbl_partymember M
+		on P.partynum = M.partynum
+		where M.partymemberid = #{id} and P.partystatus = 0
+	</select>
+	
+	
+	<!-- 로그인 중인 사용자가 생성한 파티 목록(select) -->
+	<select id="getCreatePartyList" parameterType="String" resultType="com.spring.ottw.model.PartyVO">
+		select partynum, partyname, to_char(startdate, 'yyyy.mm.dd') AS startdate, to_char(enddate, 'yyyy.mm.dd') AS enddate,
+			   nop, charge, fk_categorynum, partyleaderid, partystatus, ottid, ottpwd
+		from tbl_party
+		where partyleaderid = #{id}
+		order by partystatus asc, startdate desc
+	</select>
+	
+	
+	<!-- 회원 정보 알아오기(select) -->
+	<select id="getMemberInfo" parameterType="String" resultType="com.spring.ottw.model.MemberVO">
+		select id, name, birthday, phone, email, memberstatus
+		from tbl_member
+		where id = #{id}
+	</select>
+	
+	
+	<!-- 입력받은 비밀번호가 로그인 중인 사용자의 비밀번호가 맞는지 알아오기(select) -->
+	<select id="getId" parameterType="HashMap" resultType="String">
+		select id
+		from tbl_member
+		where id = #{id} and pwd = #{checkPwd}
+	</select>
+	
+	
+	<!-- 회원 정보 수정하기(update) -->
+	<update id="editMemberInfo" parameterType="com.spring.ottw.model.MemberVO">
+		update tbl_member
+		set phone = #{phone}, email = #{email}
+		where id = #{id}
+	</update>
+	
+	
+	<!-- 파티 기간 만료 여부 알아오기(select) -->
+	<select id="isExpiredEnddate" parameterType="String" resultType="int">
+		select trunc(to_date(#{enddate}, 'yyyy-mm-dd') - sysdate)
+		from dual
+	</select>
+	
+	
+	<!-- 파티 수정하기(update) -->
+	<update id="editParty" parameterType="com.spring.ottw.model.PartyVO">
+		update tbl_party
+		set partyname = #{partyname}, enddate = #{enddate}, nop = #{nop}, 
+			charge = #{charge}, fk_categorynum = #{fk_categorynum}, 
+			ottid = #{ottid}, ottpwd = #{ottpwd}
+		where partynum = #{partynum}
+	</update>
+	
+	
+	<!-- 파티 삭제하기(delete) -->
+	<delete id="delParty" parameterType="String">
+		delete from tbl_party
+		where partynum = #{partynum}
+	</delete>
+</mapper>
